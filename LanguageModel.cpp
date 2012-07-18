@@ -20,7 +20,7 @@ using namespace std;
 class LanguageModel
 {
     private:
-        double thresold;        // score thresold
+        double threshold;        // score threshold
         double mu;              // Diri parameter mu
         string tweet_path;      // tweet path to be processed
 
@@ -28,14 +28,14 @@ class LanguageModel
         LanguageModel()
         {
             tweet_path = "";
-            thresold = 0;
+            threshold = 0;
             mu = 1000;
         }
 
-        LanguageModel(string _tweet_path,  double _mu, double _thresold)
+        LanguageModel(string _tweet_path,  double _mu, double _threshold)
         {
             tweet_path = _tweet_path;
-            thresold = _thresold;
+            threshold = _threshold;
             mu = _mu;
         }
 
@@ -57,7 +57,7 @@ class LanguageModel
                 Tweet t(id,line.erase(0,pos+1),ci);
 
                 double score = computeKLDivergence(q,t,ci); 
-                if(score >= thresold) {
+                if(score >= threshold) {
                     printResult(q,t,score,"yes",run,debug);
                 }
 
@@ -88,8 +88,8 @@ class LanguageModel
 
                 double score = computeKLDivergence(q,t,ci); 
                 for(int i=0; i<number; i++) {
-                    double cur_thresold = thresold + inc * double(i);
-                    if(score >= cur_thresold) {
+                    double cur_threshold = threshold + inc * double(i);
+                    if(score >= cur_threshold) {
                         printResultToFile(q,t,output[i],score,"yes",run);
                     }
                 }
@@ -97,6 +97,71 @@ class LanguageModel
             file.close();
         }
 
+        void processTweetsDynamicThreshold(Corpus &ci, Query &q, double dynamic_factor = 1.2, string run = "PKUICST",  bool debug = false)
+        {
+            ifstream file(tweet_path.c_str());
+            string line;
+            bool first_flag = true;
+            while(getline(file, line)){
+                int pos = line.find("\t");
+                string id = line.substr(0,pos);
+                Tweet t(id,line.erase(0,pos+1),ci);
+
+                double score = computeKLDivergence(q,t,ci); 
+                if(score >= threshold) {
+                    if(first_flag) {
+                        first_flag = false;
+                        double update_score = score * dynamic_factor;
+                        if( update_score > threshold) {
+                            cout << "UPDATE THRESHOLD FROM " << threshold;
+                            threshold = update_score;
+                            cout << " TO " << threshold << endl;
+                        }
+                    }
+                    printResult(q,t,score,"yes",run,debug);
+                }
+
+            }
+            file.close();
+        }
+
+ 
+        void processTweetsDynamicThresholdBash(ofstream output[],Corpus &ci, Query &q, double dynamic_factor = 1.2, double inc = 0.5, int number=0, string result_path="", string run="PKUICST") {
+            string line;
+            ifstream file(tweet_path.c_str());
+            double cur_threshold[200];
+            bool first_flag[200];
+
+            // initiate the threshold
+            for(int i=0; i<number; i++) {
+                first_flag[i] = true;
+                cur_threshold[i] = threshold + inc * double(i);
+            }
+
+            while(getline(file, line)){
+                ci.add_new_tweet();
+                int pos = line.find("\t");
+                string id = line.substr(0,pos);
+                Tweet t(id,line.erase(0,pos+1),ci);
+
+                double score = computeKLDivergence(q,t,ci); 
+                for(int i=0; i<number; i++) {
+                    if(score >= cur_threshold[i]) {
+                        if(first_flag[i]) {
+                            first_flag[i] = false;
+                            double update_score = score * dynamic_factor;
+                            if( update_score > cur_threshold[i]) {
+                                cout << "UPDATE THRESHOLD FROM " << cur_threshold[i];
+                                cur_threshold[i] = update_score;
+                                cout << " TO " << cur_threshold[i] << endl;
+                            }
+                        }
+                        printResultToFile(q,t,output[i],score,"yes",run);
+                    }
+                }
+            }
+            file.close();
+        }
 
         /**
          * LanguageModel::printResult() print the tweet to the terminal
@@ -110,7 +175,7 @@ class LanguageModel
         void printResult(Query &q, Tweet &t, double score, string flag = "yes", string run = "PKUICST", bool debug = false ) {
             if(debug) cout <<  q.get_id() << " " << t.get_id() << " " << score << " " << t.get_content() << endl;
             else cout <<  q.get_id() << " " << t.get_id() << " " << score << " " << flag << " " << run << endl;
-            
+
         }
 
         /**

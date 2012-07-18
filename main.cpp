@@ -82,9 +82,10 @@ int main(int argc, char **argv)
             string corpus_path = config["corpusPath"] + id + ".corpus";
 
             LanguageModel lm(corpus_path, mu, thresold);
-            lm.processTweets(ci,q,run,true);
+            //lm.processTweetsDynamicThreshold(ci,q,1.2,run,true);
+            //lm.processTweets(ci,q,run,true);
             //lm.processTweetsBash(output,ci,q,inc,number,result_path,run);
-
+            lm.processTweetsDynamicThresholdBash(output,ci,q,1.6,inc,number,result_path,run);
         }
     }
 
